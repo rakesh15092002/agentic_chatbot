@@ -1,110 +1,73 @@
 import Image from "next/image";
 import React, { useState } from "react";
 import { assets } from "@/assets/assets";
-import { useClerk,UserButton } from "@clerk/nextjs";
+import { useClerk, UserButton } from "@clerk/nextjs";
 import { useAppContext } from "@/context/AppContext";
-import ChatLabel from '@/components/ChatLabel'
+import ChatLabel from "@/components/ChatLabel";
 
 const Sidebar = ({ expand, setExpand }) => {
-  const {openSignIn} = useClerk();
-  const {user} = useAppContext();
-  const [openMenu,setOpenMenu] = useState({id:0,open:false})
+  const { openSignIn } = useClerk();
+  const { user, chats, createNewChat } = useAppContext();
+  const [openMenu, setOpenMenu] = useState({ id: 0, open: false });
+
+  const handleScroll = () => {
+    if (openMenu.open) setOpenMenu({ id: 0, open: false });
+  };
+
   return (
     <div
-      className={`flex flex-col justify-between bg-[#212327] pt-7 transition-all z-50 
-      max-md:absolute max-md:h-screen relative
-      ${expand ? "p-4 w-64" : "md:w-20 w-0 max-md:overflow-hidden"}`}
+      className={`flex flex-col justify-between bg-[#212327] pt-7 transition-all duration-300 z-50 
+      max-md:absolute max-md:h-screen relative border-r border-gray-800
+      ${expand ? "p-4 w-72" : "md:w-20 w-0 max-md:overflow-hidden"}`}
+      // Important: Ensure no onClick={setExpand(false)} is here on the main wrapper
     >
       <div>
-        <div className={`flex ${expand ? "flex-row gap-10" : "flex-col items-center gap-8"}`}>
-          
-          {/* Logo */}
-          <Image
-            src={expand ? assets.logo_text : assets.logo_icon}
-            alt="logo"
-            className={expand ? "w-36" : "w-10"}
-          />
-
-          {/* Toggle Button */}
+        <div className={`flex items-center w-full mb-6 ${expand ? "justify-end" : "justify-center"}`}>
           <div
             onClick={() => setExpand(!expand)}
-            className="group relative flex items-center justify-center 
-            hover:bg-gray-500/20 transition-all duration-300 h-9 w-9 
-            aspect-square rounded-lg cursor-pointer z-0"
+            className="group flex items-center justify-center hover:bg-gray-700/50 text-gray-400 hover:text-white transition-all duration-200 h-10 w-10 rounded-full cursor-pointer"
           >
-            {/* Mobile Menu Icon */}
-            <Image src={assets.menu_icon} alt="" className="md:hidden" />
-
-            {/* Desktop Expand/Collapse Icon */}
-            <Image
-              src={expand ? assets.sidebar_close_icon : assets.sidebar_icon}
-              alt=""
-              className="hidden md:block w-7"
-            />
-
-            {/* Tooltip */}
-            <div
-              className={`absolute w-max z-50 whitespace-nowrap
-                ${expand ? "left-1/2 -translate-x-1/2 top-14" : "left-10 top-1/2 -translate-y-1/2"} 
-                opacity-0 group-hover:opacity-100 
-                transition bg-black text-white text-sm px-3 py-2 rounded-lg 
-                shadow-lg pointer-events-none`}
-            >
-              {expand ? "Close sidebar" : "Open sidebar"}
-
-              {/* Tooltip Arrow */}
-              <div
-                className={`w-3 h-3 absolute bg-black rotate-45 
-                  ${expand 
-                    ? "left-1/2 -top-1.5 -translate-x-1/2" 
-                    : "left-[-4px] top-1/2 -translate-y-1/2"}`}
-              ></div>
-            </div>
+            {expand ? (
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            )}
           </div>
-
         </div>
 
-        <button className={`mt-8 flex items-center justify-center cursor-pointer ${expand?"bg-primary hover:opacity-90 rounded-2xl gap-2 p-2.5 w-max ":"group relative h-9 w-9 mx-auto hover: bg-gray-500/30 rounded-lg"}`}>
-            <Image className={expand ? 'w-6':'w-7' } src={expand?assets.chat_icon:assets.chat_icon_dull} alt=""/>
-            <div className="absolute w-max top-12 -right-12 opacity-0 group-hover:opacity-100 transition bg-black text-white text-sm px-3 py-2 rounded-lg shadow-lg pointer-events-none">
-                New chat
-                <div className="w-3 h-3 absolute bg-black rotate-45 left-4 -bottom-1.5"></div>
-            </div>
-            {expand && <p className="text-white font-medium">New chat</p>}
+        <button
+          onClick={createNewChat}
+          className={`flex items-center justify-center cursor-pointer transition-all duration-300 ${
+            expand ? "bg-primary hover:opacity-90 rounded-full h-12 w-full gap-3 shadow-md" : "group relative h-10 w-10 mx-auto hover:bg-gray-700/50 rounded-full"
+          }`}
+        >
+          <Image className={expand ? "w-5" : "w-6"} src={expand ? assets.chat_icon : assets.chat_icon_dull} alt="New Chat" />
+          {expand && <p className="text-white text-base font-medium">New chat</p>}
         </button>
 
-        <div className={`mt-8 text-white/25 text-sm ${expand?"block":"hidden"}`}>
-            <p className="my-1">Recents</p>
-            {/* chat label */}
-            <ChatLabel openMenu={openMenu} setOpenMenu = {setOpenMenu}/>
+        <div
+          onScroll={handleScroll}
+          className={`mt-8 text-white/40 text-sm overflow-y-auto max-h-[60vh] custom-scrollbar ${expand ? "block opacity-100" : "hidden opacity-0"}`}
+        >
+          <p className="my-2 px-2 font-medium text-xs uppercase tracking-wider">Recents</p>
+          {chats
+            .filter((chat) => chat && chat.name)
+            .map((chat) => (
+              <ChatLabel key={chat._id} name={chat.name} id={chat._id} openMenu={openMenu} setOpenMenu={setOpenMenu} />
+            ))}
         </div>
       </div>
 
-    <div>
-        <div className={`flex items-center cursor-pointer group relative ${expand?"gap-1 text-white/80 text-sm p-2 border border-primary rounded-lg hover:bg-white/10 cursor-pointer":"h-10 w-10 max-auto hover:bg-gray-500/30 rounded-lg"}`}>
-            <Image className={expand?"w-5" :"w-6.5 mx-auto"} src={expand?assets.phone_icon:assets.phone_icon_dull} alt=""/>
-            <div className={`absolute -top-60 pb-8 ${!expand && "-right-40"} opacity-0 group-hover:opacity-100 hidden group-hover:block transition`}>
-                <div className="relative w-max bg-black text-white text-sm p-3 rounded-lg shadow-lg ">
-                <Image src={assets.qrcode} alt="" className="w-44"/>
-                <p>Scan to get chat bot app</p>
-                <div className={`w-3 h-3 absolute bg-black rotate-45 ${expand?"right-1/2":"left-4"} -bottom-1.5 `}></div>
-                </div>
-            </div>
-        {expand && <><span>get app</span> <Image src={assets.new_icon} alt=""/></>}
+      <div className="mb-4">
+        <div onClick={user ? null : openSignIn} className={`flex items-center ${expand ? "hover:bg-white/5 rounded-xl px-3 py-3 justify-start" : "justify-center w-full hover:bg-white/5 rounded-xl py-3"} cursor-pointer text-white/70`}>
+          {user ? <div className="flex items-center justify-center"><UserButton /></div> : <Image src={assets.profile_icon} alt="" className="w-7 h-7 rounded-full opacity-80" />}
+          {expand && <span className="ml-3 font-medium text-sm truncate">My Profile</span>}
         </div>
-
-        <div 
-        onClick={user?null:openSignIn}
-        className={`flex items-center ${expand?'hover:bg-white/10 rounded-lg':'justify-center w-full'} gap-3 text-white/60 text-sm p-2 mt-2 cursor-pointer `}>
-          {
-          user?<UserButton/>:<Image src={assets.profile_icon} alt="" className="w-7"  />
-          }
-            
-            {expand && <span>My Profile</span>}
-        </div>
-    </div>
-
-
+      </div>
     </div>
   );
 };

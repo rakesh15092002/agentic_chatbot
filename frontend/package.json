@@ -11,13 +11,16 @@
   "dependencies": {
     "@clerk/nextjs": "^6.36.2",
     "axios": "^1.13.2",
+    "groq-sdk": "^0.37.0",
     "mongoose": "^9.0.1",
     "next": "16.0.8",
     "openai": "^6.10.0",
     "prismjs": "^1.30.0",
     "react": "19.2.1",
     "react-dom": "19.2.1",
+    "react-hot-toast": "^2.6.0",
     "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "svix": "^1.82.0"
   },
   "devDependencies": {
