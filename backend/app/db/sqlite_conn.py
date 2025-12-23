@@ -1,16 +1,27 @@
 import sqlite3
 from pathlib import Path
+import os
 
+# Define the database path
 DB_PATH = Path("chatbot.db")
 
 def get_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row  # Rows behave like dictionaries
+    """
+    Returns a SQLite connection with WAL mode enabled for concurrency.
+    check_same_thread=False is required for FastAPI async endpoints.
+    """
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    
+    # CRITICAL FIX: Enable Write-Ahead Logging (WAL)
+    # This prevents "database is locked" errors when reading/writing simultaneously.
+    conn.execute("PRAGMA journal_mode=WAL;")
+    
+    conn.row_factory = sqlite3.Row  # Access columns by name
     return conn
 
 def init_db():
     """
-    Create tables for threads and messages if they don't exist
+    Creates tables if they don't exist.
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -38,3 +49,4 @@ def init_db():
 
     conn.commit()
     conn.close()
+    print(f"Database initialized at {DB_PATH} (WAL Mode Enabled).")

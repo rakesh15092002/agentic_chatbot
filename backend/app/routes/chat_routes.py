@@ -1,13 +1,20 @@
 from fastapi import APIRouter
-from app.schemas.chat_schema import ChatRequest, ChatResponse
-from app.services.chat_service import send_message
+from fastapi.responses import StreamingResponse
+from app.schemas.chat_schema import ChatRequest
+# Make sure you import the new streaming function we created in Step 1
+from app.services.chat_service import stream_chat_response 
 
 router = APIRouter()
 
-@router.post("/send", response_model=ChatResponse)
-def chat_send(request: ChatRequest):
+@router.post("/send")
+async def chat_send(request: ChatRequest):
     """
-    Send message to chatbot with thread support
+    Stream message to chatbot with thread support.
+    Returns a stream of text chunks instead of a single JSON object.
     """
-    reply = send_message(request.thread_id, request.message)
-    return {"reply": reply, "thread_id": request.thread_id}
+    
+    # We call the generator function inside StreamingResponse
+    return StreamingResponse(
+        stream_chat_response(request.message, request.thread_id),
+        media_type="text/event-stream"
+    )
