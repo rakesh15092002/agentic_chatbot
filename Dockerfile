@@ -43,7 +43,7 @@ COPY backend/ .
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 # Install production dependencies only
-RUN npm install --omit=dev
+RUN npm install install
 
 # Copy the built artifacts from Stage 1
 COPY --from=frontend-builder /app/frontend/.next ./.next
