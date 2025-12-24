@@ -24,7 +24,7 @@ jobs:
       - name: Log in to container registry
         uses: docker/login-action@v2
         with:
-          registry: mcr.microsoft.com/
+          registry: mcr.microsoft.com
           username: ${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_D1A72F08B7AF418C8949D3BF26354735 }}
           password: ${{ secrets.AZUREAPPSERVICE_CONTAINERPASSWORD_EF32EC695AAE4E249B41B2EF29DDFD12 }}
 
@@ -33,6 +33,10 @@ jobs:
         with:
           context: .
           push: true
+          # --- FIX: Pass the secret to the Dockerfile ---
+          build-args: |
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          # ----------------------------------------------
           tags: mcr.microsoft.com/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_D1A72F08B7AF418C8949D3BF26354735 }}/appsvc/staticsite:${{ github.sha }}
           file: ./Dockerfile
 
@@ -45,7 +49,6 @@ jobs:
     needs: build
     
     steps:
-      
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -60,4 +63,3 @@ jobs:
           app-name: 'cortana'
           slot-name: 'Production'
           images: 'mcr.microsoft.com/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_D1A72F08B7AF418C8949D3BF26354735 }}/appsvc/staticsite:${{ github.sha }}'
-          

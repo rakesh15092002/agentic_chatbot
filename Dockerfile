@@ -14,6 +14,7 @@ COPY frontend/ .
 # Next.js embeds NEXT_PUBLIC_ variables into the code during build, 
 # so this key MUST be available right now.
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+# 2. Set it as an environment variable so Next.js can read it
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 # --- FIX END ---
 
