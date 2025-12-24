@@ -4,7 +4,7 @@ from app.routes.chat_routes import router as chat_router
 from app.routes.thread_routes import router as thread_router
 from app.db.sqlite_conn import init_db
 
-app = FastAPI(title="LangGraph Chatbot with Threads" , root_path="/api/py")
+app = FastAPI(title="LangGraph Chatbot with Threads")
 
 # CORS Configuration
 app.add_middleware(
