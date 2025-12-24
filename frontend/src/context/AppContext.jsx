@@ -14,16 +14,12 @@ export const AppContextProvider = ({ children }) => {
   const { getToken } = useAuth();
   const router = useRouter();
 
-  // --- State ---
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  // 1. NEW: State for storing messages of the current active chat
   const [messages, setMessages] = useState([]); 
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
 
-  // --- Fetch Chat List (Sidebar) ---
   const fetchUsersChats = async () => {
     try {
       if (!user) return;
@@ -48,10 +44,10 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // --- Create Chat ---
-  const createNewChat = async () => {
+  // --- MODIFIED: Added 'redirect' parameter ---
+  const createNewChat = async (redirect = true) => {
     try {
-      if (!user) return;
+      if (!user) return null;
       const token = await getToken();
       const { data } = await axios.post(
         "/api/chat/create",
@@ -62,24 +58,26 @@ export const AppContextProvider = ({ children }) => {
       if (data.success) {
         const newChat = data.data;
         setChats((prev) => [newChat, ...prev]);
-        router.push(`/chat/${newChat._id}`);
-        toast.success("New chat started");
+        
+        // Only redirect if explicitly requested (Sidebar usage would use router.push separately anyway now)
+        if (redirect) {
+            router.push(`/chat/${newChat._id}`);
+            toast.success("New chat started");
+        }
+        return newChat; 
       } else {
         toast.error(data.message);
+        return null;
       }
     } catch (error) {
       toast.error("Failed to create chat");
+      return null;
     }
   };
 
-  // 2. NEW: Fetch Messages for a specific Thread ID
   const fetchMessages = async (threadId) => {
     try {
       setIsMessagesLoading(true);
-      setMessages([]); // Clear old messages instantly
-
-      // Direct call to FastAPI (Ensure your FastAPI is running on port 8000)
-      // Or use your Next.js API route if you created a proxy
       const { data } = await axios.get(`http://localhost:8000/thread/${threadId}/messages`);
 
       if (data && data.messages) {
@@ -108,7 +106,6 @@ export const AppContextProvider = ({ children }) => {
         fetchUsersChats,
         createNewChat,
         loading,
-        // Export new states and functions
         messages, 
         setMessages,
         fetchMessages,

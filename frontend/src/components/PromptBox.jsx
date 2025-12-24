@@ -1,22 +1,23 @@
-// src/components/PromptBox.jsx
 "use client";
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import Image from "next/image";
 import { assets } from "@/assets/assets";
 import { useAppContext } from "@/context/AppContext";
 import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
 
-const PromptBox = ({ isLoading, setIsLoading, threadId }) => {
+const PromptBox = ({ isLoading, setIsLoading, threadId, setMessages }) => {
   const [prompt, setPrompt] = useState("");
-  
-  // Feature Toggles State
+  const textareaRef = useRef(null);
+  const router = useRouter();
+
   const [activeFeatures, setActiveFeatures] = useState({
     deepThink: false,
     search: false,
     agentic: false,
   });
 
-  const { user, setMessages } = useAppContext();
+  const { user, createNewChat } = useAppContext();
 
   const toggleFeature = (feature) => {
     setActiveFeatures((prev) => ({
@@ -25,28 +26,59 @@ const PromptBox = ({ isLoading, setIsLoading, threadId }) => {
     }));
   };
 
+  const handleInput = (e) => {
+    setPrompt(e.target.value);
+    e.target.style.height = "auto";
+    e.target.style.height = `${e.target.scrollHeight}px`;
+  };
+
   const sendPrompt = async (e) => {
     if (e) e.preventDefault();
-    
+
     if (!user) return toast.error("Login to send message");
     if (isLoading) return toast.error("Wait for response");
     if (!prompt.trim()) return;
 
-    const activeThreadId = threadId || "default-thread-id";
+    if (typeof setMessages !== "function") {
+      return toast.error("Internal Error: UI State update failed.");
+    }
+
     const promptCopy = prompt;
-    setPrompt(""); 
+    
+    // 1. Clear UI immediately
+    setPrompt("");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+    
+    // 2. START LOADING
     setIsLoading(true);
 
-    try {
-      setMessages(prev => [...prev, { role: "user", content: promptCopy }]);
-      setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+    // Optimistically Add User Message
+    setMessages(prev => [...prev, { role: "user", content: promptCopy }]);
+    // Add Placeholder for AI response
+    setMessages(prev => [...prev, { role: "assistant", content: "" }]);
 
+    try {
+      let activeThreadId = threadId;
+      let isNewChat = false;
+
+      // --- LOGIC: Handle New Chat Creation ---
+      // If no threadId is passed, we are on the Home page.
+      if (!activeThreadId) {
+        // Create the chat in DB first, but pass 'false' to prevent auto-redirect
+        const newChat = await createNewChat(false); 
+        if (!newChat) throw new Error("Failed to create chat");
+        activeThreadId = newChat._id;
+        isNewChat = true;
+      }
+
+      // --- FETCH STREAM ---
       const response = await fetch("http://localhost:8000/chat/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           thread_id: activeThreadId,
           message: promptCopy,
+          features: activeFeatures 
         }),
       });
 
@@ -64,35 +96,48 @@ const PromptBox = ({ isLoading, setIsLoading, threadId }) => {
         if (value) {
           const chunk = decoder.decode(value, { stream: true });
           aiResponse += chunk;
+          
           setMessages(prev => {
              const newMessages = [...prev];
              const lastMsgIndex = newMessages.length - 1;
-             newMessages[lastMsgIndex] = { ...newMessages[lastMsgIndex], content: aiResponse };
+             if (lastMsgIndex >= 0) {
+                 newMessages[lastMsgIndex] = { ...newMessages[lastMsgIndex], content: aiResponse };
+             }
              return newMessages;
           });
         }
       }
 
+      // --- REDIRECT IF NEW CHAT ---
+      // We redirect AFTER the message has started/finished so the user sees the flow
+      if (isNewChat) {
+         router.push(`/chat/${activeThreadId}`);
+      }
+
     } catch (error) {
       console.error("Stream Error:", error);
       toast.error("Failed to get response");
-      setPrompt(promptCopy);
-      setMessages(prev => prev.slice(0, -1));
+      setPrompt(promptCopy); // Restore text if failed
+      setMessages(prev => prev.slice(0, -1)); // Remove empty bubble
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    // 🛠️ FIX: Ensure this container matches the width of the message list (max-w-3xl)
-    <form
-      className="w-full max-w-3xl bg-[#2f2f33] p-4 rounded-3xl transition-all shadow-xl border border-white/5"
-    >
+    <form className="w-full max-w-3xl bg-[#2f2f33] p-4 rounded-3xl transition-all shadow-xl border border-white/5">
       <textarea
-        className="outline-none w-full resize-none overflow-hidden break-words bg-transparent text-white placeholder-white/40 px-2 text-base"
-        rows={2}
-        placeholder={activeFeatures.agentic ? "Ask Agent to perform a task..." : "Message AI..."}
-        onChange={(e) => setPrompt(e.target.value)}
+        ref={textareaRef}
+        disabled={isLoading}
+        className={`outline-none w-full resize-none bg-transparent text-white placeholder-white/40 px-2 text-base custom-scrollbar overflow-y-auto max-h-52 min-h-[48px] 
+        ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+        rows={1}
+        placeholder={
+            isLoading 
+            ? (activeFeatures.search ? "Searching the web..." : "AI is thinking...") 
+            : (activeFeatures.agentic ? "Ask Agent to perform a task..." : "Message AI...")
+        }
+        onChange={handleInput}
         value={prompt}
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey) {
@@ -142,9 +187,12 @@ const PromptBox = ({ isLoading, setIsLoading, threadId }) => {
             className={`${prompt ? "bg-blue-600 shadow-blue-500/20 shadow-md" : "bg-[#55555c]"} h-10 w-10 flex items-center justify-center rounded-full cursor-pointer transition-all duration-200`}
           >
             {isLoading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                // DYNAMIC LOADER
+                <div className={`w-5 h-5 border-2 border-t-transparent rounded-full animate-spin 
+                    ${activeFeatures.search ? "border-green-400" : "border-white/50"}`}>
+                </div>
             ) : (
-                assets.send_icon && <Image className={`h-5 w-5 transition-transform ${prompt ? "-rotate-0" : ""}`} src={assets.send_icon} alt="Send" />
+                assets.arrow_icon && <Image className={`h-5 w-5 transition-transform ${prompt ? "-rotate-0" : ""}`} src={assets.arrow_icon} alt="Send" />
             )}
           </button>
         </div>

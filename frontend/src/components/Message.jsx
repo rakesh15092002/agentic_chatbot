@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, memo } from "react";
 import Image from "next/image";
 import { assets } from "@/assets/assets";
 import Markdown from "react-markdown";
@@ -8,8 +8,9 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import toast from "react-hot-toast";
 import { FaCheck, FaCopy } from "react-icons/fa"; 
+import Loader from "./Loader";
 
-const Message = ({ role, content }) => {
+const Message = memo(({ role, content, isGenerating }) => {
   const isUser = role === "user";
 
   const copyMessage = () => {
@@ -19,15 +20,24 @@ const Message = ({ role, content }) => {
 
   return (
     <div className={`flex w-full mb-6 ${isUser ? "justify-end" : "justify-start"}`}>
+      
       {/* Avatar (AI Only) */}
       {!isUser && (
-        <div className="flex-shrink-0 mr-4">
+        <div className="flex-shrink-0 w-8 h-8 aspect-square mr-4 relative">
+          
+          {/* Loader Logic: Shows if isGenerating is true and this is the active message */}
+          {isGenerating && (
+             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 z-10">
+                 <Loader />
+             </div>
+          )}
+
           <Image
             src={assets.gemini_icon || assets.logo_icon} 
             alt="AI"
             width={36}
             height={36}
-            className="rounded-full border border-white/10 p-1 bg-black/20"
+            className="rounded-full w-8 h-8 border absolute border-white/10 p-1 bg-black/20 z-0"
           />
         </div>
       )}
@@ -49,32 +59,22 @@ const Message = ({ role, content }) => {
               <Markdown
                 remarkPlugins={[remarkGfm]}
                 components={{
-                  // --- 🛠️ FIX STARTS HERE ---
                   code({ node, inline, className, children, ...props }) {
-                    // Detect language
                     const match = /language-(\w+)/.exec(className || "");
-                    const language = match ? match[1] : "text"; // Default to 'text'
+                    const language = match ? match[1] : "text";
 
-                    // If it's a BLOCK (not inline), render the nice CodeBlock
-                    // OLD BUGGY CODE: if (!inline && match)
-                    // NEW CORRECT CODE: if (!inline)
                     if (!inline) {
                       return (
                         <CodeBlock language={language} value={String(children).replace(/\n$/, "")} />
                       );
                     }
                     
-                    // If it's INLINE (like `const x`), render a small tag
-                    // I also changed pink to a softer amber color to be safe
                     return (
                       <code className="bg-[#3b3b42] text-amber-300 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
                         {children}
                       </code>
                     );
                   },
-                  // --- FIX ENDS HERE ---
-
-                  // Styled Tables
                   table: ({ children }) => (
                     <div className="overflow-x-auto my-4 border border-white/10 rounded-lg">
                       <table className="min-w-full divide-y divide-white/10 text-left">
@@ -85,15 +85,11 @@ const Message = ({ role, content }) => {
                   thead: ({ children }) => <thead className="bg-white/5">{children}</thead>,
                   th: ({ children }) => <th className="px-4 py-2 text-sm font-semibold text-gray-200">{children}</th>,
                   td: ({ children }) => <td className="px-4 py-2 text-sm border-t border-white/5">{children}</td>,
-                  
-                  // Links
                   a: ({ href, children }) => (
                     <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
                       {children}
                     </a>
                   ),
-                  
-                  // Lists
                   ul: ({ children }) => <ul className="list-disc pl-5 my-2 space-y-1">{children}</ul>,
                   ol: ({ children }) => <ol className="list-decimal pl-5 my-2 space-y-1">{children}</ol>,
                 }}
@@ -124,7 +120,7 @@ const Message = ({ role, content }) => {
       </div>
     </div>
   );
-};
+});
 
 // --- Internal Components ---
 
@@ -184,4 +180,5 @@ const ActionButton = ({ icon, onClick, tooltip }) => (
     </button>
 );
 
+Message.displayName = 'Message'; // Required for memoized components
 export default Message;

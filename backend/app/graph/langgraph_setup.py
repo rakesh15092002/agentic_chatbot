@@ -1,15 +1,13 @@
 import os
-import sqlite3
 from typing import Annotated, TypedDict
 from dotenv import load_dotenv
 
 # LangGraph & LangChain Imports
 from langchain_groq import ChatGroq
-from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, AIMessage
-from langgraph.graph import StateGraph, START, END
+from langchain_core.messages import BaseMessage, SystemMessage
+from langgraph.graph import StateGraph, START
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
-from langgraph.checkpoint.sqlite import SqliteSaver
 
 # Import your tools
 from app.utils.tools import tools
@@ -17,12 +15,12 @@ from app.utils.tools import tools
 load_dotenv()
 
 # ==========================================
-# 1. BETTER LLM SETUP
+# 1. LLM SETUP
 # ==========================================
 llm = ChatGroq(
-    model="llama-3.3-70b-versatile",  # Upgraded to 70B for better reasoning
+    model="llama-3.3-70b-versatile",
     api_key=os.getenv("GROQ_API_KEY"),
-    temperature=0.1,  # Lower for more consistent, factual responses
+    temperature=0.1,
 )
 
 llm_with_tools = llm.bind_tools(tools)
@@ -40,59 +38,49 @@ YOUR CORE CAPABILITIES:
 
 DECISION MAKING RULES - FOLLOW THESE STRICTLY:
 
-**When to Use Search:**
-- Questions about current events, news, or "what's happening"
-- Questions about people's current positions/roles (president, PM, CEO, etc.)
-- Any question that starts with: "who is the current...", "what's happening...", "latest news..."
-- Questions about recent developments, ongoing situations
-- Questions about any fact that could have changed recently
-- If you're unsure about current information
+### 🚫 WHEN TO ANSWER DIRECTLY (DO NOT USE TOOLS):
+**Check this list FIRST. If the query falls here, use your internal knowledge.**
+- **Coding & Technical Tasks**: Writing code (Python, JS, React, etc.), debugging, explaining syntax, or standard libraries (e.g., "Create an express server", "How does useEffect work?").
+- **General Knowledge**: Static facts, history, science, definitions, and concepts that do not change frequently (e.g., "Who is Newton?", "What is photosynthesis?").
+- **Chit-Chat**: Greetings, "How are you?", or questions about your identity.
+- **Logic/Reasoning**: Questions requiring common sense or logical deduction without new data.
 
-**When to Use Calculator:**
-- Any mathematical calculation request
-- Questions with numbers and operations (multiply, divide, add, subtract)
+### ✅ WHEN TO USE TOOLS:
 
-**When to Use Stock Price:**
-- Questions about stock prices, ticker symbols
-- Market value questions
+**1. Search (duckduckgo_search):**
+- **ONLY** for real-time information or events happening **now** or very recently.
+- Questions about current news, stock market trends, or "what happened today".
+- Questions about specific people's *current* roles (e.g., "Who is the CEO of Twitter now?").
+- If the user explicitly asks to "Search for..." or "Check the web".
+- If you strictly do not know the answer from your internal memory.
 
-**When to Use Weather:**
-- Questions about weather, temperature, climate in specific locations
+**2. Calculator:**
+- Any mathematical calculation request involving specific numbers.
+- Complex arithmetic that is prone to error if done mentally.
+
+**3. Stock Price:**
+- Specific questions about current stock prices or ticker symbols.
+
+**4. Weather:**
+- Questions about current weather, forecasts, or temperature in specific locations.
 
 RESPONSE GUIDELINES:
 
 **DO:**
-- Use tools proactively when needed
-- Provide direct, confident answers based on tool results
-- Synthesize information from multiple search results
-- Be concise and clear
-- If search finds relevant info, present it as factual
+- Use tools proactively ONLY when real-time data is required.
+- Provide direct, confident answers for coding and general topics WITHOUT searching.
+- Synthesize information from multiple search results when search is actually used.
 
 **DON'T:**
-- Say "it seems" or "the search results mention" - just state the facts
-- Apologize for using tools
-- Explain the search process unless results are genuinely unclear
-- Refuse to answer when you have tool access
-- Make up information - use search when unsure
+- **DO NOT SEARCH** for coding questions (e.g., "write a python script").
+- Say "it seems" or "the search results mention" - just state the facts.
+- Apologize for using tools.
+- Make up information - use search ONLY when you are unsure.
 
-EXAMPLES OF PERFECT RESPONSES:
-
-User: "Who is the prime minister of India?"
-You: [Use search] → "Narendra Modi is the Prime Minister of India."
-
-User: "What's happening in Bangladesh?"
-You: [Use search] → "Recent developments in Bangladesh include: [list 2-3 key points from search]"
-
-User: "Calculate 47 * 89"
-You: [Use calculator] → "47 × 89 = 4,183"
-
-User: "What actions has India taken regarding Bangladesh?"
-You: [Use search with query: "India Bangladesh relations recent actions"] → "India has responded to the Bangladesh situation through: [summarize key diplomatic, security, or policy actions found]"
-
-Remember: You have tools to get current information. Use them confidently and provide direct answers."""
+Remember: Prioritize your internal knowledge for coding and general facts. Use tools only for real-time data."""
 
 # ==========================================
-# 3. IMPROVED STATE & NODES
+# 3. STATE & NODES
 # ==========================================
 class ChatState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
@@ -101,31 +89,27 @@ def chat_node(state: ChatState):
     """Enhanced agent node with better context management."""
     messages = state["messages"]
     
-    # Add system message
-    sys_msg = SystemMessage(content=UNIVERSAL_SYSTEM_PROMPT)
+    # Add system message only if not present
+    if not messages or not isinstance(messages[0], SystemMessage):
+        sys_msg = SystemMessage(content=UNIVERSAL_SYSTEM_PROMPT)
+        messages = [sys_msg] + messages
     
-    # Context window management - keep last 20 messages + system
-    # This prevents token limit issues while maintaining context
-    if len(messages) > 20:
-        recent_messages = messages[-20:]
-    else:
-        recent_messages = messages
-    
-    final_messages = [sys_msg] + recent_messages
+    # Smart context window management
+    # Keep system message + last 15 conversation turns (30 messages)
+    if len(messages) > 31:  # system + 30 messages
+        messages = [messages[0]] + messages[-30:]
     
     # Invoke LLM
-    response = llm_with_tools.invoke(final_messages)
+    response = llm_with_tools.invoke(messages)
     return {"messages": [response]}
 
 # Tool node
 tool_node = ToolNode(tools)
 
 # ==========================================
-# 4. BUILD GRAPH
+# 4. BUILD GRAPH (WITHOUT CHECKPOINTER)
 # ==========================================
-conn = sqlite3.connect("chatbot.db", check_same_thread=False)
-checkpointer = SqliteSaver(conn=conn)
-
+# We'll add the checkpointer dynamically in chat_service.py
 graph = StateGraph(ChatState)
 
 # Add Nodes
@@ -134,15 +118,7 @@ graph.add_node("tools", tool_node)
 
 # Add Edges
 graph.add_edge(START, "agent")
-
-# Conditional routing: agent decides to use tools or end
-graph.add_conditional_edges(
-    "agent",
-    tools_condition,
-)
-
-# After tools, return to agent to process results
+graph.add_conditional_edges("agent", tools_condition)
 graph.add_edge("tools", "agent")
 
-# Compile
-chatbot = graph.compile(checkpointer=checkpointer)
+# Don't compile here - we'll do it in chat_service with async checkpointer
