@@ -4,13 +4,13 @@ from app.routes.chat_routes import router as chat_router
 from app.routes.thread_routes import router as thread_router
 from app.db.sqlite_conn import init_db
 
-app = FastAPI(title="LangGraph Chatbot with Threads")
+app = FastAPI(title="LangGraph Chatbot with Threads" , root_path="/api/py")
 
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
     # Add your frontend URL here (usually localhost:3000 for React or 5173 for Vite)
-    allow_origins=["http://localhost:3000", "http://localhost:5173"], 
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
