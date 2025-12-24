@@ -1,7 +1,7 @@
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const FASTAPI_BASE = "http://127.0.0.1:8000";
+const FASTAPI_BASE = "/api/py";
 
 export async function GET(req) {
   try {
