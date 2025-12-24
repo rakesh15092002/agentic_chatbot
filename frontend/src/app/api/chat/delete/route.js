@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const FASTAPI_BASE = `${process.env.BACKEND_BASE_URL}/api/py`;
+const FASTAPI_BASE = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/api/py`;
 
 // We use POST here because your React component sends a POST request
 export async function POST(req) {
