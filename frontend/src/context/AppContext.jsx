@@ -81,7 +81,7 @@ export const AppContextProvider = ({ children }) => {
   const fetchMessages = async (threadId) => {
     try {
       setIsMessagesLoading(true);
-      const { data } = await axios.get(`${FASTAPI_BASE}/api/py/thread/${threadId}/messages`);
+      const { data } = await axios.get(`${FASTAPI_BASE}/thread/${threadId}/messages`);
 
       if (data && data.messages) {
         setMessages(data.messages);
