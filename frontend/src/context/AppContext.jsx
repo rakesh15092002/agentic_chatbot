@@ -9,7 +9,7 @@ export const AppContext = createContext(null);
 
 export const useAppContext = () => useContext(AppContext);
 
-const FASTAPI_BASE = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/api/py`;
+const FASTAPI_BASE = `/api/py`;
 
 export const AppContextProvider = ({ children }) => {
   const { user } = useUser();
